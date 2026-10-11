@@ -751,53 +751,67 @@ for (const s of jarSpots) {
 // === GIANT LOLLIPOPS ===
 function makeLollipop(size, colA, colB) {
   const g = new THREE.Group();
-  // Stick
-  const sg = new THREE.CylinderGeometry(0.022, 0.028, 0.85, 8, 3);
+  // Stick — natural wood, slightly bent
+  const sg = new THREE.CylinderGeometry(0.02, 0.027, 0.85, 7, 4);
   const sp = sg.attributes.position;
-  for (let i = 0; i < sp.count; i++) sp.setX(i, sp.getX(i) + Math.sin(sp.getY(i)*5)*0.015);
+  for (let i = 0; i < sp.count; i++) {
+    sp.setX(i, sp.getX(i) + Math.sin(sp.getY(i)*4.2)*0.02 + rr(-0.004,0.004));
+    sp.setZ(i, sp.getZ(i) + Math.cos(sp.getY(i)*3.1)*0.012);
+  }
   sg.computeVertexNormals();
-  const stick = new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.6 }));
+  const stick = new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.75 }));
   stick.position.y = 0.42;
   stick.castShadow = true;
   g.add(stick);
-  // Swirl disc
+  // Swirl disc — HAND-MADE look like real lollipops in photo
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const x = c.getContext('2d');
-  x.fillStyle = '#ffffff'; x.fillRect(0, 0, 256, 256);
+  x.fillStyle = '#f8f4ec'; x.fillRect(0, 0, 256, 256);
   const ca = '#'+colA.toString(16).padStart(6,'0'), cb = '#'+colB.toString(16).padStart(6,'0');
   x.translate(128, 128);
-  for (let r = 124; r > 0; r -= 9) {
-    x.strokeStyle = (r/9) % 2 < 1 ? ca : cb;
-    x.lineWidth = 9;
-    x.beginPath();
-    for (let a = 0; a <= Math.PI*2.2; a += 0.1) {
-      const spiralR = r - (a/(Math.PI*2.2))*9;
-      const px = Math.cos(a + r*0.05)*spiralR, py = Math.sin(a + r*0.05)*spiralR;
-      a === 0 ? x.moveTo(px, py) : x.lineTo(px, py);
+  // Irregular hand-poured swirl — not perfect spirals
+  const arms = 2 + Math.floor(rand()*2);
+  for (let arm = 0; arm < arms; arm++) {
+    const startA = (arm/arms)*Math.PI*2 + rr(-0.3,0.3);
+    x.strokeStyle = arm % 2 ? ca : cb;
+    for (let r = 8; r < 122; r += rr(7,11)) {
+      x.lineWidth = rr(10, 16);
+      x.lineCap = 'round';
+      const a0 = startA + r*0.045 + rr(-0.1,0.1);
+      const a1 = startA + (r+10)*0.045 + rr(-0.1,0.1);
+      x.beginPath();
+      x.arc(rr(-4,4), rr(-4,4), r + rr(-3,3), a0, a1 + 0.35);
+      x.stroke();
     }
-    x.stroke();
+  }
+  // Center blob
+  x.fillStyle = ca;
+  x.beginPath(); x.arc(rr(-3,3), rr(-3,3), rr(14,20), 0, Math.PI*2); x.fill();
+  // Sugar texture
+  for (let i = 0; i < 400; i++) {
+    x.fillStyle = `rgba(255,255,255,${rand()*0.15})`;
+    const a = rand()*Math.PI*2, r = Math.sqrt(rand())*120;
+    x.fillRect(Math.cos(a)*r, Math.sin(a)*r, 1.5, 1.5);
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const dg = new THREE.CylinderGeometry(size, size, 0.045, 28, 2);
-  perturb(dg, 0.006);
-  const disc = new THREE.Mesh(dg, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.28 }));
-  // Map texture to top face
-  const uv = dg.attributes.uv;
-  disc.rotation.x = Math.PI/2;
-  disc.position.y = 0.92;
+  // Disc — slightly domed and irregular like real hard candy
+  const dg = new THREE.SphereGeometry(size, 28, 14, 0, Math.PI*2, 0, Math.PI*0.32);
+  perturb(dg, size*0.04);
+  const disc = new THREE.Mesh(dg, new THREE.MeshPhysicalMaterial({
+    map: tex, roughness: 0.22, clearcoat: 0.7, clearcoatRoughness: 0.25
+  }));
+  disc.rotation.x = Math.PI/2 + Math.PI;
+  disc.position.y = 0.92 + size*0.28;
+  disc.scale.set(1, 1, 0.42);
   disc.castShadow = true;
   g.add(disc);
-  // Plastic wrap shine
-  const wrap = new THREE.Mesh(
-    new THREE.SphereGeometry(size*1.02, 16, 12, 0, Math.PI*2, 0, Math.PI/2),
-    new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, roughness: 0.05 })
-  );
-  wrap.position.y = 0.92;
-  wrap.rotation.x = Math.PI/2;
-  wrap.scale.set(1, 1, 0.35);
-  g.add(wrap);
+  // Backing disc
+  const back = new THREE.Mesh(new THREE.CylinderGeometry(size*0.98, size*0.98, 0.03, 24), new THREE.MeshStandardMaterial({ color: 0xf0e8d8, roughness: 0.4 }));
+  back.rotation.x = Math.PI/2;
+  back.position.y = 0.9;
+  g.add(back);
   return g;
 }
 
@@ -865,18 +879,48 @@ function makeLollipop(size, colA, colB) {
 // === COTTON CANDY ===
 function makeCottonCandy(colorHex) {
   const g = new THREE.Group();
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.32, 8), new THREE.MeshStandardMaterial({ color: 0xe8d8b8, roughness: 0.8 }));
-  cone.position.y = 0.16;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.34, 7), new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.85 }));
+  cone.position.y = 0.17;
+  // Slight bend
+  const cp = cone.geometry.attributes.position;
+  for (let i = 0; i < cp.count; i++) cp.setX(i, cp.getX(i) + cp.getY(i)*0.08);
+  cone.geometry.computeVertexNormals();
   g.add(cone);
-  for (let i = 0; i < 18; i++) {
-    const s = new THREE.Mesh(
-      new THREE.SphereGeometry(rr(0.055, 0.1), 8, 6),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(colorHex).offsetHSL(0, 0, rr(-0.06, 0.06)), roughness: 1 })
+  // Wispy fibers — many thin strands, not blobs
+  const baseColor = new THREE.Color(colorHex);
+  for (let i = 0; i < 90; i++) {
+    const len = rr(0.1, 0.28);
+    const fg = new THREE.CylinderGeometry(0.004, 0.007, len, 4, 2);
+    const fp = fg.attributes.position;
+    for (let j = 0; j < fp.count; j++) {
+      fp.setX(j, fp.getX(j) + Math.sin(fp.getY(j)*20)*0.012);
+      fp.setZ(j, fp.getZ(j) + Math.cos(fp.getY(j)*17)*0.012);
+    }
+    fg.computeVertexNormals();
+    const fiber = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({
+      color: baseColor.clone().offsetHSL(rr(-0.02,0.02), rr(-0.05,0.05), rr(-0.08,0.08)),
+      roughness: 1, transparent: true, opacity: rr(0.75, 0.95)
+    }));
+    // Arrange in fluffy cloud shape
+    const theta = rand()*Math.PI*2, phi = rand()*Math.PI*0.7;
+    const rad = rr(0.02, 0.13) * (1 - phi/(Math.PI)*0.4);
+    fiber.position.set(
+      Math.sin(phi)*Math.cos(theta)*rad,
+      0.42 + Math.cos(phi)*0.11 + rr(-0.02,0.02),
+      Math.sin(phi)*Math.sin(theta)*rad
     );
-    perturb(s.geometry, 0.018);
-    const a = rand()*Math.PI*2, r = rand()*0.1;
-    s.position.set(Math.cos(a)*r, 0.4 + rand()*0.17, Math.sin(a)*r);
-    s.castShadow = true;
+    fiber.rotation.set(rr(-0.9,0.9), rand()*Math.PI, rr(-0.9,0.9));
+    g.add(fiber);
+  }
+  // A few denser core puffs
+  for (let i = 0; i < 8; i++) {
+    const s = new THREE.Mesh(
+      new THREE.SphereGeometry(rr(0.03, 0.055), 7, 5),
+      new THREE.MeshStandardMaterial({ color: baseColor.clone().offsetHSL(0, 0, rr(-0.05,0.05)), roughness: 1, transparent: true, opacity: 0.9 })
+    );
+    perturb(s.geometry, 0.015);
+    const a = rand()*Math.PI*2;
+    s.position.set(Math.cos(a)*rr(0,0.06), 0.4 + rr(-0.03,0.1), Math.sin(a)*rr(0,0.06));
     g.add(s);
   }
   return g;
