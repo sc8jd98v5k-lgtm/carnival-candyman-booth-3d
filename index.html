@@ -114,43 +114,47 @@ function makeWoodTexture(baseColor, grainColor, size = 512) {
   c.width = c.height = size;
   const x = c.getContext('2d');
   x.fillStyle = baseColor; x.fillRect(0, 0, size, size);
-  // Long grain lines
-  for (let i = 0; i < 140; i++) {
+  // STRONG grain lines — very visible
+  for (let i = 0; i < 200; i++) {
     const y0 = rand() * size;
-    x.strokeStyle = `rgba(30,18,8,${0.06 + rand()*0.12})`;
-    x.lineWidth = 0.6 + rand()*2.4;
+    x.strokeStyle = `rgba(25,14,6,${0.15 + rand()*0.25})`;
+    x.lineWidth = 1 + rand()*3.5;
     x.beginPath();
     x.moveTo(-10, y0);
-    for (let px = 0; px <= size+10; px += 24) {
-      x.lineTo(px, y0 + Math.sin(px*0.018 + i*0.7)*9 + (rand()-0.5)*7);
+    for (let px = 0; px <= size+10; px += 20) {
+      x.lineTo(px, y0 + Math.sin(px*0.02 + i*0.7)*12 + (rand()-0.5)*10);
     }
     x.stroke();
   }
-  // Fine grain
-  for (let i = 0; i < 400; i++) {
-    x.strokeStyle = `rgba(40,24,10,${rand()*0.05})`;
-    x.lineWidth = 0.5;
-    const y0 = rand()*size;
-    x.beginPath(); x.moveTo(0, y0); x.lineTo(size, y0 + (rand()-0.5)*12); x.stroke();
-  }
-  // Knots
-  for (let i = 0; i < 6; i++) {
-    const kx = rand()*size, ky = rand()*size;
-    for (let r = 16; r > 0; r -= 2) {
-      x.strokeStyle = `rgba(28,16,6,${0.08 + (16-r)*0.014})`;
-      x.lineWidth = 1.8;
-      x.beginPath(); x.ellipse(kx, ky, r*1.6, r, 0.4, 0, Math.PI*2); x.stroke();
+  // Dark streaks
+  for (let i = 0; i < 60; i++) {
+    const y0 = rand() * size;
+    x.strokeStyle = `rgba(15,8,3,${0.2 + rand()*0.3})`;
+    x.lineWidth = 2 + rand()*5;
+    x.beginPath();
+    x.moveTo(-10, y0);
+    for (let px = 0; px <= size+10; px += 30) {
+      x.lineTo(px, y0 + Math.sin(px*0.015 + i)*15);
     }
-    x.fillStyle = 'rgba(25,14,5,0.5)';
-    x.beginPath(); x.ellipse(kx, ky, 3, 2, 0.4, 0, Math.PI*2); x.fill();
+    x.stroke();
   }
-  // Weathering / dirt
-  for (let i = 0; i < 600; i++) {
-    const l = rand() > 0.5;
-    x.fillStyle = l ? `rgba(255,240,220,${rand()*0.03})` : `rgba(10,5,2,${rand()*0.05})`;
-    x.fillRect(rand()*size, rand()*size, 1+rand()*10, 1+rand()*4);
+  // Knots — prominent
+  for (let i = 0; i < 10; i++) {
+    const kx = rand()*size, ky = rand()*size;
+    for (let r = 22; r > 0; r -= 2) {
+      x.strokeStyle = `rgba(20,10,4,${0.15 + (22-r)*0.02})`;
+      x.lineWidth = 2.5;
+      x.beginPath(); x.ellipse(kx, ky, r*1.7, r, 0.4, 0, Math.PI*2); x.stroke();
+    }
+    x.fillStyle = 'rgba(18,9,3,0.7)';
+    x.beginPath(); x.ellipse(kx, ky, 5, 3.5, 0.4, 0, Math.PI*2); x.fill();
   }
-  // Roughness variation map (same canvas reused)
+  // Heavy weathering
+  for (let i = 0; i < 1200; i++) {
+    const l = rand() > 0.4;
+    x.fillStyle = l ? `rgba(255,235,210,${rand()*0.06})` : `rgba(8,4,2,${rand()*0.1})`;
+    x.fillRect(rand()*size, rand()*size, 1+rand()*14, 1+rand()*6);
+  }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
@@ -163,42 +167,46 @@ function makePaintedWoodTexture(baseColor, size = 512) {
   c.width = c.height = size;
   const x = c.getContext('2d');
   x.fillStyle = baseColor; x.fillRect(0, 0, size, size);
-  // Brush strokes
-  for (let i = 0; i < 160; i++) {
-    x.strokeStyle = `rgba(255,255,255,${rand()*0.035})`;
+  // VISIBLE brush strokes
+  for (let i = 0; i < 220; i++) {
+    x.strokeStyle = `rgba(255,255,255,${0.04+rand()*0.08})`;
+    x.lineWidth = 2 + rand()*9;
+    x.beginPath();
+    const y0 = rand()*size;
+    x.moveTo(-10, y0); x.lineTo(size+10, y0 + (rand()-0.5)*44);
+    x.stroke();
+  }
+  for (let i = 0; i < 180; i++) {
+    x.strokeStyle = `rgba(0,0,0,${0.05+rand()*0.09})`;
     x.lineWidth = 1.5 + rand()*7;
     x.beginPath();
     const y0 = rand()*size;
     x.moveTo(-10, y0); x.lineTo(size+10, y0 + (rand()-0.5)*36);
     x.stroke();
   }
-  for (let i = 0; i < 120; i++) {
-    x.strokeStyle = `rgba(0,0,0,${rand()*0.04})`;
-    x.lineWidth = 1 + rand()*5;
-    x.beginPath();
-    const y0 = rand()*size;
-    x.moveTo(-10, y0); x.lineTo(size+10, y0 + (rand()-0.5)*30);
-    x.stroke();
-  }
-  // Chipped paint revealing wood
-  for (let i = 0; i < 90; i++) {
-    const px = rand()*size, py = rand()*size, s = 1+rand()*6;
-    x.fillStyle = `rgba(74,46,24,${0.25+rand()*0.4})`;
+  // HEAVY chipped paint revealing wood
+  for (let i = 0; i < 160; i++) {
+    const px = rand()*size, py = rand()*size, s = 2+rand()*10;
+    x.fillStyle = `rgba(74,46,24,${0.4+rand()*0.5})`;
     x.beginPath(); x.ellipse(px, py, s, s*0.7, rand()*3, 0, Math.PI*2); x.fill();
-    x.fillStyle = `rgba(40,24,12,${0.2+rand()*0.3})`;
-    x.beginPath(); x.ellipse(px, py, s*0.5, s*0.35, rand()*3, 0, Math.PI*2); x.fill();
+    x.fillStyle = `rgba(35,20,10,${0.3+rand()*0.4})`;
+    x.beginPath(); x.ellipse(px, py, s*0.55, s*0.4, rand()*3, 0, Math.PI*2); x.fill();
   }
-  // Scratches
-  for (let i = 0; i < 40; i++) {
-    x.strokeStyle = `rgba(60,36,18,${0.15+rand()*0.2})`;
-    x.lineWidth = 0.8;
-    const sx = rand()*size, sy = rand()*size, len = 10+rand()*60, a = rand()*Math.PI;
+  // Edge wear — lighter along edges
+  x.strokeStyle = 'rgba(220,200,170,0.25)';
+  x.lineWidth = 12;
+  x.strokeRect(6, 6, size-12, size-12);
+  // Scratches — visible
+  for (let i = 0; i < 70; i++) {
+    x.strokeStyle = `rgba(60,36,18,${0.25+rand()*0.35})`;
+    x.lineWidth = 1.2;
+    const sx = rand()*size, sy = rand()*size, len = 15+rand()*90, a = rand()*Math.PI;
     x.beginPath(); x.moveTo(sx, sy); x.lineTo(sx+Math.cos(a)*len, sy+Math.sin(a)*len); x.stroke();
   }
-  // Grime
-  for (let i = 0; i < 300; i++) {
-    x.fillStyle = `rgba(15,10,5,${rand()*0.06})`;
-    x.fillRect(rand()*size, rand()*size, 2+rand()*8, 2+rand()*5);
+  // Grime — heavier
+  for (let i = 0; i < 500; i++) {
+    x.fillStyle = `rgba(12,8,4,${rand()*0.12})`;
+    x.fillRect(rand()*size, rand()*size, 2+rand()*12, 2+rand()*8);
   }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
