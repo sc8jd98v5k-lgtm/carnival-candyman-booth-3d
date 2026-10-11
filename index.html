@@ -47,13 +47,19 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 2.4, 0);
 controls.update();
 
-scene.add(new THREE.AmbientLight(0x8a80a0, 0.55));
-const key = new THREE.PointLight(0xffd9a0, 150, 40);
+scene.add(new THREE.AmbientLight(0x9a90b0, 0.4));
+const key = new THREE.PointLight(0xffd0a0, 120, 45);
 key.position.set(4, 7, 8);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
 scene.add(key);
-const interior = new THREE.PointLight(0xffb060, 80, 14);
+const interior = new THREE.PointLight(0xffa050, 60, 14);
 interior.position.set(0, 3, 0);
 scene.add(interior);
+// Cool rim light for depth
+const rim = new THREE.DirectionalLight(0x6a7ab0, 0.35);
+rim.position.set(-6, 5, -8);
+scene.add(rim);
 
 {
   const g = new THREE.CircleGeometry(26, 48);
@@ -75,9 +81,83 @@ function organic(geo, amp) {
 const booth = new THREE.Group();
 const BW = 7, BD = 4.2, BH = 3.4; // width, depth, wall height
 
-const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.85 });
-const tealMat = new THREE.MeshStandardMaterial({ color: 0x2a8a8a, roughness: 0.7 });
-const darkWood = new THREE.MeshStandardMaterial({ color: 0x3a2415, roughness: 0.9 });
+// === RICH PROCEDURAL TEXTURES ===
+function woodTexture(baseColor, darkColor) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 512;
+  const x = c.getContext('2d');
+  x.fillStyle = baseColor; x.fillRect(0, 0, 512, 512);
+  // Wood grain — long wavy lines
+  for (let i = 0; i < 90; i++) {
+    const y0 = rand() * 512;
+    x.strokeStyle = `rgba(40,22,10,${0.08 + rand()*0.14})`;
+    x.lineWidth = 0.8 + rand()*2.2;
+    x.beginPath();
+    x.moveTo(-10, y0);
+    for (let px = 0; px <= 522; px += 30) {
+      x.lineTo(px, y0 + Math.sin(px*0.02 + i)*8 + (rand()-0.5)*6);
+    }
+    x.stroke();
+  }
+  // Knots
+  for (let i = 0; i < 7; i++) {
+    const kx = rand()*512, ky = rand()*512;
+    for (let r = 14; r > 0; r -= 2.5) {
+      x.strokeStyle = `rgba(35,20,8,${0.1 + (14-r)*0.012})`;
+      x.lineWidth = 1.6;
+      x.beginPath();
+      x.ellipse(kx, ky, r*1.5, r, 0.3, 0, Math.PI*2);
+      x.stroke();
+    }
+  }
+  // Weathering
+  for (let i = 0; i < 500; i++) {
+    x.fillStyle = `rgba(${rand()>0.5?255:0},${rand()>0.5?240:20},${rand()>0.5?220:10},${rand()*0.03})`;
+    x.fillRect(rand()*512, rand()*512, 2+rand()*8, 1+rand()*3);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function weatheredPaintTexture(baseColor) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 512;
+  const x = c.getContext('2d');
+  x.fillStyle = baseColor; x.fillRect(0, 0, 512, 512);
+  // Paint brush strokes
+  for (let i = 0; i < 120; i++) {
+    x.strokeStyle = `rgba(255,255,255,${rand()*0.04})`;
+    x.lineWidth = 2 + rand()*6;
+    x.beginPath();
+    const y0 = rand()*512;
+    x.moveTo(0, y0); x.lineTo(512, y0 + (rand()-0.5)*30);
+    x.stroke();
+  }
+  // Chipped paint / wear
+  for (let i = 0; i < 80; i++) {
+    x.fillStyle = `rgba(60,40,25,${0.05 + rand()*0.1})`;
+    const s = 1 + rand()*5;
+    x.fillRect(rand()*512, rand()*512, s, s*0.7);
+  }
+  // Grime in corners
+  const grad = x.createRadialGradient(256,256,100,256,256,360);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(20,15,10,0.18)');
+  x.fillStyle = grad; x.fillRect(0,0,512,512);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+const woodTex = woodTexture('#6b4a2e');
+const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.78 });
+const darkWoodTex = woodTexture('#4a3020');
+const darkWood = new THREE.MeshStandardMaterial({ map: darkWoodTex, roughness: 0.85 });
+const tealTex = weatheredPaintTexture('#2f8f8a');
+const tealMat = new THREE.MeshStandardMaterial({ map: tealTex, roughness: 0.62 });
 
 // === FLOOR — wooden planks ===
 {
@@ -305,8 +385,18 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
   const x = c.getContext('2d');
   const stripes = 14, sw = 512/stripes;
   for (let s = 0; s < stripes; s++) {
-    x.fillStyle = s % 2 ? '#f5f0e6' : '#c03040';
+    x.fillStyle = s % 2 ? '#e8e0d0' : '#a82838';  // muted, aged colors
     x.fillRect(s*sw, 0, sw+1, 256);
+    // Fabric weave
+    for (let wy = 0; wy < 256; wy += 3) {
+      x.fillStyle = `rgba(0,0,0,${0.03 + rand()*0.03})`;
+      x.fillRect(s*sw, wy, sw, 1);
+    }
+    // Stains and wear
+    for (let i = 0; i < 40; i++) {
+      x.fillStyle = `rgba(60,40,20,${rand()*0.05})`;
+      x.fillRect(s*sw + rand()*sw, rand()*256, 2+rand()*6, 1+rand()*4);
+    }
   }
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
