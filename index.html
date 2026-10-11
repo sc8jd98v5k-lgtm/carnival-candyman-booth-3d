@@ -14,7 +14,7 @@
   #info b { color: #ffd54a; }
 </style>
 <script type="importmap">
-{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
 </script>
 </head>
 <body>
@@ -59,11 +59,26 @@ scene.add(fill);
 }
 
 const loader = new THREE.TextureLoader();
-function photoTex(path) {
-  const t = loader.load(path);
+loader.setCrossOrigin('anonymous');
+function photoTex(path, fallbackColor = 0x888888) {
+  const t = loader.load(
+    path,
+    undefined, // onLoad
+    undefined, // onProgress
+    (err) => console.warn('Texture failed:', path, err) // onError
+  );
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
+}
+// Fallback material if photo texture fails
+function photoMat(path, opts = {}) {
+  return new THREE.MeshStandardMaterial({
+    map: photoTex(path),
+    color: 0xffffff,
+    roughness: 0.7,
+    ...opts
+  });
 }
 
 const booth = new THREE.Group();
