@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Candyman Booth — 3D Sample</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #0a0a14; font-family: system-ui, sans-serif; }
+  #info {
+    position: absolute; top: 12px; left: 12px; color: #fff;
+    background: rgba(0,0,0,0.6); padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; max-width: 300px; line-height: 1.5;
+  }
+  #info b { color: #ffd54a; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="info">
+  <b>Candyman Booth</b> — from your photo<br>
+  Point-by-point · No humans<br>
+  Drag to orbit · Scroll to zoom
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+let seed = 42;
+function rand() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0c0e1a);
+scene.fog = new THREE.Fog(0x0c0e1a, 30, 70);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(5.5, 3.8, 10);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.6, 0);
+controls.update();
+
+// Warm carnival night lighting
+scene.add(new THREE.AmbientLight(0x8a80a0, 0.5));
+const key = new THREE.PointLight(0xffd9a0, 120, 30);
+key.position.set(0, 5, 6);
+scene.add(key);
+const interior = new THREE.PointLight(0xffb060, 60, 12);
+interior.position.set(0, 3, 1.5);
+scene.add(interior);
+
+// Ground
+{
+  const g = new THREE.CircleGeometry(22, 48);
+  const ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x1c1c22, roughness: 1 }));
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+}
+
+function organic(geo, amp) {
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setXYZ(i, pos.getX(i)+(rand()-0.5)*amp, pos.getY(i)+(rand()-0.5)*amp, pos.getZ(i)+(rand()-0.5)*amp);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+const booth = new THREE.Group();
+const BW = 7, BH = 3.2; // booth width, counter height
+
+// === BOOTH STRUCTURE — wooden frame, organic ===
+const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.85 });
+const tealMat = new THREE.MeshStandardMaterial({ color: 0x2a8a8a, roughness: 0.7 });
+
+// Side posts — slightly irregular
+for (const sx of [-1, 1]) {
+  const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 4.6, 10, 6);
+  organic(postGeo, 0.015);
+  const post = new THREE.Mesh(postGeo, woodMat);
+  post.position.set(sx * BW/2, 2.3, 0);
+  post.castShadow = true;
+  booth.add(post);
+}
+
+// Counter base — front panel with organic edge
+{
+  const geo = new THREE.BoxGeometry(BW, 1.15, 0.5, 12, 4, 2);
+  organic(geo, 0.02);
+  const counter = new THREE.Mesh(geo, tealMat);
+  counter.position.set(0, 0.58, 1.2);
+  counter.castShadow = true;
+  counter.receiveShadow = true;
+  booth.add(counter);
+  
+  // Wooden counter top — worn, irregular
+  const topGeo = new THREE.BoxGeometry(BW + 0.3, 0.09, 0.85, 14, 2, 4);
+  const tp = topGeo.attributes.position;
+  for (let i = 0; i < tp.count; i++) {
+    tp.setY(i, tp.getY(i) + Math.sin(tp.getX(i) * 3) * 0.012);
+  }
+  topGeo.computeVertexNormals();
+  const top = new THREE.Mesh(topGeo, new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.7 }));
+  top.position.set(0, 1.19, 1.2);
+  top.castShadow = true;
+  booth.add(top);
+}
+
+// "Delicious!" hand-painted sign on counter front
+{
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#f2e8d0'; x.fillRect(0, 0, 512, 256);
+  // Aged paper
+  for (let i = 0; i < 200; i++) {
+    x.fillStyle = `rgba(120,90,50,${rand() * 0.06})`;
+    x.fillRect(rand()*512, rand()*256, 3, 3);
+  }
+  x.fillStyle = '#b03030';
+  x.font = 'italic bold 84px Georgia, serif';
+  x.textAlign = 'center';
+  x.save(); x.translate(256, 130); x.rotate(-0.03);
+  x.fillText('Delicious!', 0, 0); x.restore();
+  // Small stars
+  x.fillStyle = '#b03030';
+  for (const [sx, sy] of [[60, 60], [452, 60], [60, 200], [452, 200]]) {
+    x.save(); x.translate(sx, sy);
+    x.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 - Math.PI/2;
+      const a2 = a + Math.PI/5;
+      x.lineTo(Math.cos(a)*16, Math.sin(a)*16);
+      x.lineTo(Math.cos(a2)*7, Math.sin(a2)*7);
+    }
+    x.closePath(); x.fill(); x.restore();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.2, 1.1),
+    new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 })
+  );
+  sign.position.set(-0.8, 0.58, 1.46);
+  sign.rotation.y = 0.02;
+  booth.add(sign);
+}
+
+// === CANDYMAN MARQUEE SIGN ===
+{
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 320;
+  const x = c.getContext('2d');
+  // Dark background
+  x.fillStyle = '#1a2a3a'; x.fillRect(0, 0, 1024, 320);
+  // Arched top border glow
+  x.strokeStyle = '#ffbe3c'; x.lineWidth = 6;
+  x.beginPath();
+  x.moveTo(20, 300); x.lineTo(20, 120);
+  x.quadraticCurveTo(20, 20, 512, 20);
+  x.quadraticCurveTo(1004, 20, 1004, 120);
+  x.lineTo(1004, 300); x.stroke();
+  
+  // CANDYMAN letters with bulb effect
+  x.font = 'bold 130px Arial Black, sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const text = 'CANDYMAN';
+  const tw = x.measureText(text).width;
+  const startX = 512 - tw/2;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const cw = x.measureText(text.slice(0, i+1)).width - x.measureText(text.slice(0, i)).width;
+    const cx = startX + x.measureText(text.slice(0, i)).width + cw/2;
+    // Letter glow
+    x.shadowColor = '#ff6a00'; x.shadowBlur = 25;
+    x.fillStyle = '#ff3b30';
+    x.fillText(ch, cx, 170);
+    x.shadowBlur = 0;
+    x.fillStyle = '#ffd54a';
+    x.font = 'bold 128px Arial Black, sans-serif';
+    x.fillText(ch, cx, 168);
+    x.font = 'bold 130px Arial Black, sans-serif';
+  }
+  // Bulbs around border
+  x.fillStyle = '#ffe9a8';
+  for (let i = 0; i < 60; i++) {
+    const t = i / 59;
+    let bx, by;
+    if (t < 0.25) { bx = 20 + t*4*200; by = 300 - Math.sin(t*4*Math.PI)*4; }
+    else if (t < 0.5) { const u = (t-0.25)*4; bx = 220 + u*292; by = 120 - Math.sin(u*Math.PI)*95; }
+    else if (t < 0.75) { const u = (t-0.5)*4; bx = 512 + u*292; by = 25 + Math.sin(u*Math.PI)*95; }
+    else { const u = (t-0.75)*4; bx = 804 + u*200; by = 120 + u*180; }
+    x.shadowColor = '#ffbe3c'; x.shadowBlur = 12;
+    x.beginPath(); x.arc(bx, by, 7, 0, Math.PI*2); x.fill();
+    x.shadowBlur = 0;
+  }
+  // Decorative swirls on top
+  x.strokeStyle = '#ffbe3c'; x.lineWidth = 5;
+  for (const sx of [180, 844]) {
+    x.beginPath();
+    x.arc(sx, 45, 28, 0, Math.PI*1.7);
+    x.stroke();
+    x.beginPath();
+    x.arc(sx + (sx < 512 ? 45 : -45), 30, 16, 0, Math.PI*2);
+    x.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  
+  // Arched sign board — organic
+  const shape = new THREE.Shape();
+  shape.moveTo(-3.6, 0);
+  shape.lineTo(-3.6, 1.1);
+  shape.quadraticCurveTo(-3.6, 2.0, 0, 2.0);
+  shape.quadraticCurveTo(3.6, 2.0, 3.6, 1.1);
+  shape.lineTo(3.6, 0);
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2 });
+  // UV map front to texture
+  const uv = geo.attributes.uv, posA = geo.attributes.position;
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+  for (let i=0;i<posA.count;i++){minX=Math.min(minX,posA.getX(i));maxX=Math.max(maxX,posA.getX(i));minY=Math.min(minY,posA.getY(i));maxY=Math.max(maxY,posA.getY(i));}
+  for (let i=0;i<uv.count;i++){uv.setXY(i,(posA.getX(i)-minX)/(maxX-minX),(posA.getY(i)-minY)/(maxY-minY));}
+  const sign = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+  sign.position.set(0, 3.6, 0.9);
+  sign.castShadow = true;
+  booth.add(sign);
+  
+  // Bulb glow lights
+  for (let i = 0; i < 8; i++) {
+    const gl = new THREE.PointLight(0xff9a40, 8, 4);
+    gl.position.set(-3 + i * 0.85, 4.6 + Math.sin(i/7*Math.PI)*0.7, 1.3);
+    booth.add(gl);
+  }
+}
+
+// === SUB-BANNER: SWEETS • LOLLIPOPS • CANDY APPLES • POPCORN ===
+{
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 96;
+  const x = c.getContext('2d');
+  x.fillStyle = '#f5f0e0'; x.fillRect(0, 0, 1024, 96);
+  // Slight fabric wave shading
+  for (let i = 0; i < 1024; i += 8) {
+    x.fillStyle = `rgba(0,0,0,${Math.abs(Math.sin(i*0.02))*0.04})`;
+    x.fillRect(i, 0, 8, 96);
+  }
+  x.fillStyle = '#1a7a7a';
+  x.font = 'bold 44px Arial, sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('SWEETS  •  LOLLIPOPS  •  CANDY APPLES  •  POPCORN', 512, 50);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const geo = new THREE.PlaneGeometry(BW + 0.4, 0.62, 24, 4);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin(p.getX(i)*2.5)*0.03);
+  geo.computeVertexNormals();
+  const banner = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, side: THREE.DoubleSide }));
+  banner.position.set(0, 3.35, 1.05);
+  booth.add(banner);
+}
+
+// === STRIPED AWNING — scalloped, fabric ===
+{
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  const stripes = 14, sw = 512/stripes;
+  for (let s = 0; s < stripes; s++) {
+    x.fillStyle = s % 2 ? '#f5f0e6' : '#c03040';
+    x.fillRect(s*sw, 0, sw+1, 256);
+    for (let i = 0; i < 80; i++) {
+      x.fillStyle = `rgba(0,0,0,${rand()*0.05})`;
+      x.fillRect(s*sw + rand()*sw, rand()*256, 2, 2);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  
+  const geo = new THREE.PlaneGeometry(BW + 0.6, 1.1, 40, 8);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i), py = pos.getY(i);
+    const vT = (py + 0.55) / 1.1; // 0 bottom, 1 top
+    // Slope outward + scalloped bottom edge
+    pos.setZ(i, (1-vT) * 0.55 + Math.sin(px*4)*0.02);
+    if (vT < 0.15) pos.setY(i, py - Math.abs(Math.sin(px*6))*0.12*(0.15-vT)/0.15);
+    // Fabric ripple
+    pos.setZ(i, pos.getZ(i) + Math.sin(px*8+vT*4)*0.02);
+  }
+  geo.computeVertexNormals();
+  const awn = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, side: THREE.DoubleSide }));
+  awn.position.set(0, 2.75, 1.25);
+  awn.rotation.x = 0.18;
+  awn.castShadow = true;
+  booth.add(awn);
+}
+
+// === CANDY JARS on counter ===
+function candyJar(px, pz, r, h, candyColors) {
+  const jar = new THREE.Group();
+  // Glass — slightly irregular
+  const glassGeo = new THREE.CylinderGeometry(r, r*0.92, h, 18, 4);
+  organic(glassGeo, 0.012);
+  const glass = new THREE.Mesh(glassGeo, new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.22, roughness: 0.08, metalness: 0
+  }));
+  glass.position.y = h/2;
+  jar.add(glass);
+  // Candies inside — colorful blobs
+  const n = Math.floor(r * 22);
+  for (let i = 0; i < n; i++) {
+    const cr = r * 0.22 * (0.7 + rand()*0.6);
+    const candyGeo = new THREE.SphereGeometry(cr, 8, 6);
+    organic(candyGeo, cr*0.25);
+    const candy = new THREE.Mesh(candyGeo, new THREE.MeshStandardMaterial({
+      color: candyColors[Math.floor(rand()*candyColors.length)],
+      roughness: 0.35
+    }));
+    const a = rand()*Math.PI*2, rr = rand()*r*0.62;
+    candy.position.set(Math.cos(a)*rr, rand()*h*0.75 + cr, Math.sin(a)*rr);
+    jar.add(candy);
+  }
+  // Lid — wooden, irregular
+  const lidGeo = new THREE.CylinderGeometry(r*1.06, r*1.06, 0.09, 16, 2);
+  organic(lidGeo, 0.015);
+  const lid = new THREE.Mesh(lidGeo, woodMat);
+  lid.position.y = h + 0.045;
+  jar.add(lid);
+  // Knob
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), woodMat);
+  knob.position.y = h + 0.12;
+  jar.add(knob);
+  
+  jar.position.set(px, 1.24, pz);
+  jar.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return jar;
+}
+
+const candyPalette = [0xe83a3a, 0xff8c00, 0xffd23a, 0x3aba3a, 0x3a8ae8, 0xb03ae8, 0xff6ab0, 0xffffff];
+booth.add(candyJar(-2.6, 1.1, 0.32, 0.55, candyPalette));
+booth.add(candyJar(-1.9, 1.25, 0.26, 0.45, [0xff6ab0, 0xffffff, 0xffd23a]));
+booth.add(candyJar(-1.25, 1.1, 0.3, 0.6, [0x3aba3a, 0x3a8ae8, 0xffffff]));
+booth.add(candyJar(1.3, 1.15, 0.28, 0.5, [0xe83a3a, 0xff8c00, 0xffd23a]));
+booth.add(candyJar(2.0, 1.05, 0.34, 0.62, candyPalette));
+booth.add(candyJar(2.7, 1.2, 0.24, 0.42, [0xb03ae8, 0x3a8ae8, 0x3aba3a]));
+
+// === LOLLIPOP SWIRLS ===
+function lollipop(px, pz, size, colA, colB) {
+  const grp = new THREE.Group();
+  // Stick — slightly bent
+  const stickGeo = new THREE.CylinderGeometry(0.018, 0.022, 0.55, 8, 4);
+  const sp = stickGeo.attributes.position;
+  for (let i = 0; i < sp.count; i++) sp.setX(i, sp.getX(i) + Math.sin(sp.getY(i)*6)*0.012);
+  stickGeo.computeVertexNormals();
+  const stick = new THREE.Mesh(stickGeo, new THREE.MeshStandardMaterial({ color: 0xf0e8d8, roughness: 0.6 }));
+  stick.position.y = 0.27;
+  grp.add(stick);
+  // Swirl disc — spiral texture
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, 128, 128);
+  const ca = '#'+colA.toString(16).padStart(6,'0'), cb = '#'+colB.toString(16).padStart(6,'0');
+  for (let r = 60; r > 0; r -= 7) {
+    x.strokeStyle = r % 14 < 7 ? ca : cb;
+    x.lineWidth = 7;
+    x.beginPath();
+    x.arc(64, 64, r, 0.3, Math.PI*1.9);
+    x.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const discGeo = new THREE.CylinderGeometry(size, size, 0.035, 24, 2);
+  organic(discGeo, 0.008);
+  const disc = new THREE.Mesh(discGeo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.3 }));
+  disc.rotation.x = Math.PI/2 - 0.12;
+  disc.position.y = 0.62;
+  disc.castShadow = true;
+  grp.add(disc);
+  grp.position.set(px, 1.24, pz);
+  grp.rotation.y = rand()*Math.PI*2;
+  return grp;
+}
+booth.add(lollipop(-0.7, 1.05, 0.16, 0xe83a3a, 0xffffff));
+booth.add(lollipop(-0.45, 1.2, 0.14, 0x3a8ae8, 0xffffff));
+booth.add(lollipop(-0.2, 1.0, 0.17, 0xff8c00, 0xffd23a));
+booth.add(lollipop(0.55, 1.1, 0.15, 0x3aba3a, 0xffffff));
+booth.add(lollipop(0.8, 1.25, 0.16, 0xb03ae8, 0xff6ab0));
+
+// === CANDY APPLES — shiny red ===
+function candyApple(px, pz) {
+  const grp = new THREE.Group();
+  const appleGeo = new THREE.SphereGeometry(0.11, 16, 12);
+  // Apple shape — slightly squashed with dimple
+  const ap = appleGeo.attributes.position;
+  for (let i = 0; i < ap.count; i++) {
+    const y = ap.getY(i);
+    ap.setY(i, y * 0.88);
+    if (y > 0.07) ap.setY(i, y * 0.88 - 0.02);
+  }
+  appleGeo.computeVertexNormals();
+  organic(appleGeo, 0.006);
+  const apple = new THREE.Mesh(appleGeo, new THREE.MeshPhysicalMaterial({
+    color: 0xc01818, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.1
+  }));
+  apple.position.y = 0.12;
+  apple.castShadow = true;
+  grp.add(apple);
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 6), woodMat);
+  stick.position.y = 0.28;
+  stick.rotation.z = (rand()-0.5)*0.15;
+  grp.add(stick);
+  grp.position.set(px, 1.24, pz);
+  return grp;
+}
+// Bowl of candy apples
+{
+  const bowlGeo = new THREE.CylinderGeometry(0.42, 0.3, 0.16, 20, 2);
+  organic(bowlGeo, 0.015);
+  const bowl = new THREE.Mesh(bowlGeo, new THREE.MeshStandardMaterial({ color: 0x8a8a92, metalness: 0.7, roughness: 0.35 }));
+  bowl.position.set(0.05, 1.32, 1.15);
+  booth.add(bowl);
+  for (let i = 0; i < 5; i++) {
+    const a = (i/5)*Math.PI*2;
+    booth.add(candyApple(0.05 + Math.cos(a)*0.2, 1.15 + Math.sin(a)*0.14));
+  }
+  booth.add(candyApple(0.05, 1.15));
+}
+
+// === COTTON CANDY cone (pink, fluffy) ===
+{
+  const grp = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0xf0e0c0, roughness: 0.8 }));
+  cone.position.y = 0.15;
+  grp.add(cone);
+  // Fluffy — cluster of irregular spheres
+  for (let i = 0; i < 14; i++) {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.07 + rand()*0.05, 8, 6), new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0xff9ac0).offsetHSL(0, 0, (rand()-0.5)*0.1),
+      roughness: 1
+    }));
+    organic(s.geometry, 0.02);
+    const a = rand()*Math.PI*2, r = rand()*0.09;
+    s.position.set(Math.cos(a)*r, 0.38 + rand()*0.14, Math.sin(a)*r);
+    s.castShadow = true;
+    grp.add(s);
+  }
+  grp.position.set(-2.95, 1.24, 1.3);
+  booth.add(grp);
+}
+
+// Back wall — warm glowing interior
+{
+  const wallGeo = new THREE.PlaneGeometry(BW, 2.6, 16, 8);
+  organic(wallGeo, 0.03);
+  const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 }));
+  wall.position.set(0, 2.2, -0.7);
+  booth.add(wall);
+  // Warm glow strips
+  for (let i = 0; i < 5; i++) {
+    const gl = new THREE.PointLight(0xffa050, 6, 5);
+    gl.position.set(-2.5 + i*1.25, 2.8, 0.2);
+    booth.add(gl);
+  }
+  // Hanging candy garlands
+  for (let i = 0; i < 3; i++) {
+    const pts = [];
+    for (let j = 0; j <= 12; j++) {
+      pts.push(new THREE.Vector3(-3 + j*0.5, 3.1 - Math.abs(Math.sin(j/12*Math.PI))*0.25, 0.1));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    booth.add(new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 24, 0.015, 5),
+      new THREE.MeshStandardMaterial({ color: 0x8a2a2a, roughness: 0.8 })
+    ));
+    for (let j = 0; j <= 12; j += 2) {
+      const p = curve.getPoint(j/12);
+      const c = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshStandardMaterial({
+        color: candyPalette[Math.floor(rand()*candyPalette.length)], roughness: 0.4
+      }));
+      c.position.set(p.x, p.y - 0.06, p.z);
+      booth.add(c);
+    }
+    // Offset each garland
+    pts.forEach(p => p.x += 0);
+  }
+}
+
+scene.add(booth);
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
