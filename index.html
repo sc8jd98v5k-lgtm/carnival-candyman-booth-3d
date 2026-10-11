@@ -613,63 +613,136 @@ const COUNTER_Y = 1.42, COUNTER_Z = BD/2 - 0.55;
 }
 
 // === CANDY JARS — dense, real 3D ===
-function makeCandyJar(r, h, candyCols) {
+function makeCandyJar(r, h, candyCols, jarType = 'cylinder') {
   const jar = new THREE.Group();
-  // Glass body
-  const bg = new THREE.CylinderGeometry(r, r*0.94, h, 20, 3);
-  perturb(bg, 0.008);
-  const glass = new THREE.Mesh(bg, glassMat);
-  glass.position.y = h/2;
-  jar.add(glass);
-  // Glass highlight
-  const hl = new THREE.Mesh(
-    new THREE.PlaneGeometry(r*0.5, h*0.7),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.14 })
-  );
-  hl.position.set(-r*0.45, h/2, r*0.72);
-  hl.rotation.y = -0.5;
-  jar.add(hl);
-  // Candy fill — bottom 75%
-  const fillH = h * 0.72;
-  const nCandy = Math.floor(r * h * 160);
-  for (let i = 0; i < nCandy; i++) {
-    const cr = rr(0.028, 0.05);
-    const cg = new THREE.SphereGeometry(cr, 7, 5);
-    perturb(cg, cr*0.2);
-    const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({
-      color: pick(candyCols), roughness: rr(0.25, 0.45)
-    }));
-    const a = rand()*Math.PI*2, rad = rand()*r*0.72;
-    cm.position.set(Math.cos(a)*rad, rr(cr, fillH), Math.sin(a)*rad);
-    jar.add(cm);
+  
+  if (jarType === 'apothecary') {
+    // Apothecary jar — like in photo: bulbous body, narrow neck, glass lid with knob
+    const bodyPts = [];
+    bodyPts.push(new THREE.Vector2(0.01, 0));
+    bodyPts.push(new THREE.Vector2(r*0.92, 0.01));
+    bodyPts.push(new THREE.Vector2(r, h*0.25));
+    bodyPts.push(new THREE.Vector2(r*0.95, h*0.55));
+    bodyPts.push(new THREE.Vector2(r*0.7, h*0.78));
+    bodyPts.push(new THREE.Vector2(r*0.45, h*0.88));  // neck
+    bodyPts.push(new THREE.Vector2(r*0.45, h*0.95));
+    bodyPts.push(new THREE.Vector2(r*0.52, h*0.95));  // lip
+    bodyPts.push(new THREE.Vector2(r*0.52, h));
+    const bg = new THREE.LatheGeometry(bodyPts, 24);
+    perturb(bg, 0.006);
+    const glass = new THREE.Mesh(bg, glassMat);
+    jar.add(glass);
+    // Glass lid with knob
+    const lidPts = [];
+    lidPts.push(new THREE.Vector2(0.01, 0));
+    lidPts.push(new THREE.Vector2(r*0.5, 0));
+    lidPts.push(new THREE.Vector2(r*0.55, 0.03));
+    lidPts.push(new THREE.Vector2(r*0.3, 0.06));
+    lidPts.push(new THREE.Vector2(r*0.12, 0.08));
+    lidPts.push(new THREE.Vector2(r*0.1, 0.14));  // knob stem
+    lidPts.push(new THREE.Vector2(r*0.16, 0.18)); // knob
+    lidPts.push(new THREE.Vector2(0.01, 0.2));
+    const lidGeo = new THREE.LatheGeometry(lidPts, 20);
+    const lid = new THREE.Mesh(lidGeo, glassMat);
+    lid.position.y = h;
+    jar.add(lid);
+    // Candy fill
+    const fillH = h * 0.7;
+    const nCandy = Math.floor(r * h * 200);
+    for (let i = 0; i < nCandy; i++) {
+      const cr = rr(0.025, 0.048);
+      const cg = new THREE.SphereGeometry(cr, 6, 5);
+      // Slightly irregular — like real candy
+      const cp = cg.attributes.position;
+      for (let j = 0; j < cp.count; j++) {
+        cp.setXYZ(j, cp.getX(j)*(1+rr(-0.15,0.15)), cp.getY(j)*(1+rr(-0.15,0.15)), cp.getZ(j)*(1+rr(-0.15,0.15)));
+      }
+      cg.computeVertexNormals();
+      const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({
+        color: pick(candyCols), roughness: rr(0.3, 0.5)
+      }));
+      // Pack densely — reject if outside jar profile
+      let px, py, pz, tries = 0;
+      do {
+        const a = rand()*Math.PI*2;
+        const maxR = r * 0.8 * (1 - (py/fillH)*0.3); // narrower at top
+        const rad = Math.sqrt(rand())*maxR;
+        px = Math.cos(a)*rad; pz = Math.sin(a)*rad; py = rr(cr, fillH);
+        tries++;
+      } while (tries < 5);
+      cm.position.set(px, py, pz);
+      jar.add(cm);
+    }
+  } else if (jarType === 'fishbowl') {
+    // Fishbowl — round, wide mouth
+    const bg = new THREE.SphereGeometry(r, 24, 18, 0, Math.PI*2, 0, Math.PI*0.75);
+    perturb(bg, 0.008);
+    const glass = new THREE.Mesh(bg, glassMat);
+    glass.position.y = r*0.4;
+    glass.scale.y = 0.85;
+    jar.add(glass);
+    // Candy fill
+    const nCandy = Math.floor(r * r * 120);
+    for (let i = 0; i < nCandy; i++) {
+      const cr = rr(0.025, 0.05);
+      const cg = new THREE.SphereGeometry(cr, 6, 5);
+      perturb(cg, cr*0.25);
+      const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({
+        color: pick(candyCols), roughness: rr(0.3, 0.5)
+      }));
+      const a = rand()*Math.PI*2, rad = Math.sqrt(rand())*r*0.75;
+      const maxY = Math.sqrt(Math.max(0, (r*0.8)**2 - rad*rad)) * 0.85;
+      cm.position.set(Math.cos(a)*rad, r*0.4 - r*0.3 + rand()*maxY*1.2, Math.sin(a)*rad);
+      if (cm.position.y > r*0.1) jar.add(cm);
+    }
+  } else {
+    // Classic cylinder with wooden lid
+    const bg = new THREE.CylinderGeometry(r, r*0.94, h, 20, 3);
+    perturb(bg, 0.008);
+    const glass = new THREE.Mesh(bg, glassMat);
+    glass.position.y = h/2;
+    jar.add(glass);
+    const fillH = h * 0.72;
+    const nCandy = Math.floor(r * h * 180);
+    for (let i = 0; i < nCandy; i++) {
+      const cr = rr(0.028, 0.052);
+      const cg = new THREE.SphereGeometry(cr, 7, 5);
+      perturb(cg, cr*0.22);
+      const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({
+        color: pick(candyCols), roughness: rr(0.28, 0.48)
+      }));
+      const a = rand()*Math.PI*2, rad = Math.sqrt(rand())*r*0.72;
+      cm.position.set(Math.cos(a)*rad, rr(cr, fillH), Math.sin(a)*rad);
+      jar.add(cm);
+    }
+    const lg = new THREE.CylinderGeometry(r*1.08, r*1.08, 0.075, 18, 2);
+    perturb(lg, 0.01);
+    const lid = new THREE.Mesh(lg, woodMid);
+    lid.position.y = h + 0.037;
+    lid.castShadow = true;
+    jar.add(lid);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 6), woodDark);
+    knob.position.y = h + 0.095;
+    jar.add(knob);
   }
-  // Lid
-  const lg = new THREE.CylinderGeometry(r*1.08, r*1.08, 0.08, 18, 2);
-  perturb(lg, 0.01);
-  const lid = new THREE.Mesh(lg, woodMid);
-  lid.position.y = h + 0.04;
-  lid.castShadow = true;
-  jar.add(lid);
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), woodDark);
-  knob.position.y = h + 0.1;
-  jar.add(knob);
   
   jar.traverse(o => { if (o.isMesh && o.material !== glassMat) o.castShadow = true; });
   return jar;
 }
 
-// Pack the counter DENSELY like the photo
+// Pack the counter DENSELY like the photo — varied jar types, touching each other
 const jarSpots = [];
-// Front row
-for (let i = 0; i < 9; i++) {
-  jarSpots.push({ x: -3.1 + i*0.78 + rr(-0.08,0.08), z: COUNTER_Z + rr(-0.05,0.12), r: rr(0.24,0.33), h: rr(0.42,0.62) });
+const jarTypes = ['apothecary', 'fishbowl', 'cylinder', 'apothecary', 'cylinder'];
+// Front row — dense
+for (let i = 0; i < 10; i++) {
+  jarSpots.push({ x: -3.2 + i*0.71 + rr(-0.05,0.05), z: COUNTER_Z + rr(-0.03,0.08), r: rr(0.26,0.34), h: rr(0.45,0.65), type: pick(jarTypes) });
 }
-// Back row
-for (let i = 0; i < 7; i++) {
-  jarSpots.push({ x: -2.7 + i*0.9 + rr(-0.08,0.08), z: COUNTER_Z - 0.42 + rr(-0.05,0.05), r: rr(0.22,0.3), h: rr(0.5,0.7) });
+// Back row — taller, packed tight
+for (let i = 0; i < 8; i++) {
+  jarSpots.push({ x: -2.9 + i*0.82 + rr(-0.05,0.05), z: COUNTER_Z - 0.38 + rr(-0.04,0.04), r: rr(0.24,0.32), h: rr(0.55,0.75), type: pick(jarTypes) });
 }
 for (const s of jarSpots) {
-  const jar = makeCandyJar(s.r, s.h, CANDY_COLORS);
+  const jar = makeCandyJar(s.r, s.h, CANDY_COLORS, s.type);
   jar.position.set(s.x, COUNTER_Y + 0.045, s.z);
   jar.rotation.y = rand()*Math.PI*2;
   booth.add(jar);
