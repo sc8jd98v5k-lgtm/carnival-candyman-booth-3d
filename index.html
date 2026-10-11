@@ -60,25 +60,41 @@ scene.add(fill);
 
 const loader = new THREE.TextureLoader();
 loader.setCrossOrigin('anonymous');
-function photoTex(path, fallbackColor = 0x888888) {
+// Track texture load status
+const texStatus = {};
+function photoTex(path, fallbackColor = 0xcc8866) {
+  texStatus[path] = 'loading';
   const t = loader.load(
     path,
-    undefined, // onLoad
-    undefined, // onProgress
-    (err) => console.warn('Texture failed:', path, err) // onError
+    () => { texStatus[path] = 'loaded'; console.log('Tex OK:', path); },
+    undefined,
+    (err) => { texStatus[path] = 'failed'; console.warn('Tex FAIL:', path); }
   );
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
 }
-// Fallback material if photo texture fails
-function photoMat(path, opts = {}) {
-  return new THREE.MeshStandardMaterial({
-    map: photoTex(path),
-    color: 0xffffff,
+// Material with photo texture + visible fallback color
+// If texture fails, the color shows instead of black
+function photoMat(path, fallbackColor, opts = {}) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: fallbackColor,
     roughness: 0.7,
     ...opts
   });
+  // Apply texture when it loads; keep fallback color as base
+  loader.load(path,
+    (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      mat.map = tex;
+      mat.color.set(0xffffff); // Full texture color when loaded
+      mat.needsUpdate = true;
+    },
+    undefined,
+    () => console.warn('Photo texture failed, using fallback:', path)
+  );
+  return mat;
 }
 
 const booth = new THREE.Group();
@@ -105,7 +121,7 @@ const BW = 7.2, BD = 4.0;
   let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
   for (let i=0;i<pa.count;i++){minX=Math.min(minX,pa.getX(i));maxX=Math.max(maxX,pa.getX(i));minY=Math.min(minY,pa.getY(i));maxY=Math.max(maxY,pa.getY(i));}
   for (let i=0;i<uv.count;i++)uv.setXY(i,(pa.getX(i)-minX)/(maxX-minX),(pa.getY(i)-minY)/(maxY-minY));
-  const sign = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 }));
+  const sign = new THREE.Mesh(geo, photoMat('candyman-crops/sign.jpg', 0x8a2a2a, { roughness: 0.5 }));
   sign.position.set(-0.2, 4.35, 1.85);
   sign.castShadow = true;
   booth.add(sign);
@@ -115,7 +131,7 @@ const BW = 7.2, BD = 4.0;
 {
   const tex = photoTex('candyman-crops/banner.jpg');
   const geo = new THREE.BoxGeometry(7.4, 0.85, 0.12, 1, 1, 1);
-  const banner = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+  const banner = new THREE.Mesh(geo, photoMat('candyman-crops/banner.jpg', 0xd8ccaa, { roughness: 0.7 }));
   banner.position.set(-0.2, 3.75, 1.95);
   banner.castShadow = true;
   booth.add(banner);
@@ -143,7 +159,7 @@ const BW = 7.2, BD = 4.0;
   // Fix UVs after deformation
   const uv = geo.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i), uv.getY(i));
-  const awning = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, side: THREE.DoubleSide }));
+  const awning = new THREE.Mesh(geo, photoMat('candyman-crops/awning.jpg', 0xaa4444, { roughness: 0.85, side: THREE.DoubleSide }));
   awning.position.set(-0.2, 3.05, 2.1);
   awning.rotation.x = 0.25;
   awning.castShadow = true;
@@ -194,7 +210,7 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
 {
   const tex = photoTex('candyman-crops/counter_front.jpg');
   const geo = new THREE.BoxGeometry(7.0, 1.35, 0.6, 1, 1, 1);
-  const counter = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+  const counter = new THREE.Mesh(geo, photoMat('candyman-crops/counter_front.jpg', 0x2a7a7a, { roughness: 0.7 }));
   counter.position.set(-0.2, 0.72, BD/2 - 0.4);
   counter.castShadow = true;
   counter.receiveShadow = true;
@@ -227,7 +243,7 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     );
   }
   geo.computeVertexNormals();
-  const display = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+  const display = new THREE.Mesh(geo, photoMat('candyman-crops/left_jars.jpg', 0x886644, { roughness: 0.6 }));
   display.position.set(-2.4, 2.75, BD/2 - 0.3);
   display.castShadow = true;
   booth.add(display);
@@ -244,7 +260,7 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     );
   }
   geo2.computeVertexNormals();
-  const display2 = new THREE.Mesh(geo2, new THREE.MeshStandardMaterial({ map: tex2, roughness: 0.6 }));
+  const display2 = new THREE.Mesh(geo2, photoMat('candyman-crops/interior_left.jpg', 0x775533, { roughness: 0.6 }));
   display2.position.set(-0.3, 2.5, BD/2 - 0.6);
   display2.castShadow = true;
   booth.add(display2);
@@ -263,7 +279,7 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
-  const roofMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, side: THREE.DoubleSide });
+  const roofMat = photoMat('candyman-crops/left_jars.jpg', 0x886644, { roughness: 0.9, side: THREE.DoubleSide });
   
   const roofW = BW + 1.0, roofD = BD + 1.0, peakH = 1.4;
   for (const sz of [-1, 1]) {
