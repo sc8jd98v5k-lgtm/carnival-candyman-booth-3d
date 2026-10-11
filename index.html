@@ -52,21 +52,27 @@ controls.target.set(0, 2.9, 0);
 controls.update();
 controls.maxPolarAngle = Math.PI * 0.52;
 
-// === LIGHTING — warm carnival night ===
-scene.add(new THREE.AmbientLight(0x8a7a90, 0.35));
-const moonLight = new THREE.DirectionalLight(0x8a9ac0, 0.25);
+// === LIGHTING — warm carnival night, photorealistic ===
+scene.add(new THREE.AmbientLight(0x9a8a95, 0.28));
+const moonLight = new THREE.DirectionalLight(0x8a9ac8, 0.32);
 moonLight.position.set(-6, 10, -4);
 scene.add(moonLight);
 
-// Warm key from front (like photo's glow)
-const keyLight = new THREE.SpotLight(0xffd9a0, 180, 40, Math.PI/5, 0.4);
-keyLight.position.set(2, 7, 10);
+// Warm key from front — soft, natural
+const keyLight = new THREE.SpotLight(0xffd2a0, 220, 45, Math.PI/4.5, 0.55, 1.2);
+keyLight.position.set(2.5, 7.5, 10.5);
 keyLight.target.position.set(0, 2.5, 0);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
-keyLight.shadow.bias = -0.0005;
+keyLight.shadow.bias = -0.0004;
+keyLight.shadow.radius = 6;
 scene.add(keyLight);
 scene.add(keyLight.target);
+
+// Bounce fill from below (ground bounce)
+const bounce = new THREE.PointLight(0x8a6a50, 12, 18);
+bounce.position.set(0, 0.5, 6);
+scene.add(bounce);
 
 // Interior warm glow
 const interiorLight = new THREE.PointLight(0xffa040, 50, 12);
@@ -102,20 +108,163 @@ const BW = 7.4;  // width
 const BD = 4.4;  // depth
 const WALL_H = 3.3;
 
+// === PHOTOREALISTIC PROCEDURAL TEXTURES ===
+function makeWoodTexture(baseColor, grainColor, size = 512) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const x = c.getContext('2d');
+  x.fillStyle = baseColor; x.fillRect(0, 0, size, size);
+  // Long grain lines
+  for (let i = 0; i < 140; i++) {
+    const y0 = rand() * size;
+    x.strokeStyle = `rgba(30,18,8,${0.06 + rand()*0.12})`;
+    x.lineWidth = 0.6 + rand()*2.4;
+    x.beginPath();
+    x.moveTo(-10, y0);
+    for (let px = 0; px <= size+10; px += 24) {
+      x.lineTo(px, y0 + Math.sin(px*0.018 + i*0.7)*9 + (rand()-0.5)*7);
+    }
+    x.stroke();
+  }
+  // Fine grain
+  for (let i = 0; i < 400; i++) {
+    x.strokeStyle = `rgba(40,24,10,${rand()*0.05})`;
+    x.lineWidth = 0.5;
+    const y0 = rand()*size;
+    x.beginPath(); x.moveTo(0, y0); x.lineTo(size, y0 + (rand()-0.5)*12); x.stroke();
+  }
+  // Knots
+  for (let i = 0; i < 6; i++) {
+    const kx = rand()*size, ky = rand()*size;
+    for (let r = 16; r > 0; r -= 2) {
+      x.strokeStyle = `rgba(28,16,6,${0.08 + (16-r)*0.014})`;
+      x.lineWidth = 1.8;
+      x.beginPath(); x.ellipse(kx, ky, r*1.6, r, 0.4, 0, Math.PI*2); x.stroke();
+    }
+    x.fillStyle = 'rgba(25,14,5,0.5)';
+    x.beginPath(); x.ellipse(kx, ky, 3, 2, 0.4, 0, Math.PI*2); x.fill();
+  }
+  // Weathering / dirt
+  for (let i = 0; i < 600; i++) {
+    const l = rand() > 0.5;
+    x.fillStyle = l ? `rgba(255,240,220,${rand()*0.03})` : `rgba(10,5,2,${rand()*0.05})`;
+    x.fillRect(rand()*size, rand()*size, 1+rand()*10, 1+rand()*4);
+  }
+  // Roughness variation map (same canvas reused)
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+function makePaintedWoodTexture(baseColor, size = 512) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const x = c.getContext('2d');
+  x.fillStyle = baseColor; x.fillRect(0, 0, size, size);
+  // Brush strokes
+  for (let i = 0; i < 160; i++) {
+    x.strokeStyle = `rgba(255,255,255,${rand()*0.035})`;
+    x.lineWidth = 1.5 + rand()*7;
+    x.beginPath();
+    const y0 = rand()*size;
+    x.moveTo(-10, y0); x.lineTo(size+10, y0 + (rand()-0.5)*36);
+    x.stroke();
+  }
+  for (let i = 0; i < 120; i++) {
+    x.strokeStyle = `rgba(0,0,0,${rand()*0.04})`;
+    x.lineWidth = 1 + rand()*5;
+    x.beginPath();
+    const y0 = rand()*size;
+    x.moveTo(-10, y0); x.lineTo(size+10, y0 + (rand()-0.5)*30);
+    x.stroke();
+  }
+  // Chipped paint revealing wood
+  for (let i = 0; i < 90; i++) {
+    const px = rand()*size, py = rand()*size, s = 1+rand()*6;
+    x.fillStyle = `rgba(74,46,24,${0.25+rand()*0.4})`;
+    x.beginPath(); x.ellipse(px, py, s, s*0.7, rand()*3, 0, Math.PI*2); x.fill();
+    x.fillStyle = `rgba(40,24,12,${0.2+rand()*0.3})`;
+    x.beginPath(); x.ellipse(px, py, s*0.5, s*0.35, rand()*3, 0, Math.PI*2); x.fill();
+  }
+  // Scratches
+  for (let i = 0; i < 40; i++) {
+    x.strokeStyle = `rgba(60,36,18,${0.15+rand()*0.2})`;
+    x.lineWidth = 0.8;
+    const sx = rand()*size, sy = rand()*size, len = 10+rand()*60, a = rand()*Math.PI;
+    x.beginPath(); x.moveTo(sx, sy); x.lineTo(sx+Math.cos(a)*len, sy+Math.sin(a)*len); x.stroke();
+  }
+  // Grime
+  for (let i = 0; i < 300; i++) {
+    x.fillStyle = `rgba(15,10,5,${rand()*0.06})`;
+    x.fillRect(rand()*size, rand()*size, 2+rand()*8, 2+rand()*5);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+function makeFabricTexture(c1, c2, size = 512) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const x = c.getContext('2d');
+  const stripes = 12, sw = size/stripes;
+  for (let s = 0; s < stripes; s++) {
+    x.fillStyle = s % 2 ? c1 : c2;
+    x.fillRect(s*sw, 0, sw+1, size);
+  }
+  // Weave
+  for (let wy = 0; wy < size; wy += 2) {
+    for (let wx = 0; wx < size; wx += 2) {
+      x.fillStyle = `rgba(0,0,0,${((wx+wy)%4===0)?0.05:0.02})`;
+      x.fillRect(wx, wy, 2, 1);
+    }
+  }
+  // Thread variation
+  for (let i = 0; i < 2000; i++) {
+    x.fillStyle = `rgba(${rand()>0.5?255:0},${rand()>0.5?255:0},${rand()>0.5?240:10},${rand()*0.04})`;
+    x.fillRect(rand()*size, rand()*size, 2, 1);
+  }
+  // Stains / sun-fade
+  for (let i = 0; i < 60; i++) {
+    x.fillStyle = `rgba(80,60,30,${rand()*0.05})`;
+    x.beginPath(); x.ellipse(rand()*size, rand()*size, 4+rand()*20, 3+rand()*12, rand()*3, 0, Math.PI*2); x.fill();
+  }
+  const grad = x.createLinearGradient(0, 0, 0, size);
+  grad.addColorStop(0, 'rgba(255,250,235,0.08)');
+  grad.addColorStop(1, 'rgba(20,10,5,0.14)');
+  x.fillStyle = grad; x.fillRect(0, 0, size, size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+const woodDarkTex = makeWoodTexture('#4a2e18');
+const woodMidTex = makeWoodTexture('#6a452a');
+const tealTex = makePaintedWoodTexture('#1e7a78');
+const tealDarkTex = makePaintedWoodTexture('#156060');
+
 // === MATERIALS ===
-const woodDark = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.85 });
-const woodMid = new THREE.MeshStandardMaterial({ color: 0x6a452a, roughness: 0.8 });
-const tealPaint = new THREE.MeshStandardMaterial({ color: 0x1e7a78, roughness: 0.55 });
-const tealDark = new THREE.MeshStandardMaterial({ color: 0x156060, roughness: 0.6 });
+const woodDark = new THREE.MeshStandardMaterial({ map: woodDarkTex, roughness: 0.82, bumpMap: woodDarkTex, bumpScale: 0.6 });
+const woodMid = new THREE.MeshStandardMaterial({ map: woodMidTex, roughness: 0.78, bumpMap: woodMidTex, bumpScale: 0.5 });
+const tealPaint = new THREE.MeshStandardMaterial({ map: tealTex, roughness: 0.52, bumpMap: tealTex, bumpScale: 0.3 });
+const tealDark = new THREE.MeshStandardMaterial({ map: tealDarkTex, roughness: 0.58, bumpMap: tealDarkTex, bumpScale: 0.3 });
 const glassMat = new THREE.MeshPhysicalMaterial({
-  color: 0xffffff, transparent: true, opacity: 0.18,
-  roughness: 0.05, metalness: 0, side: THREE.DoubleSide
+  color: 0xf8fbff, transparent: true, opacity: 0.14,
+  roughness: 0.03, metalness: 0, side: THREE.DoubleSide,
+  clearcoat: 1, clearcoatRoughness: 0.04,
+  envMapIntensity: 1.2, specularIntensity: 1.0
 });
 const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffd98a });
 const bulbGlowMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
 
-// Candy colors from photo
-const CANDY_COLORS = [0xd42a2a, 0xe86a2a, 0xf0c020, 0x3aa83a, 0x2a7ad4, 0x8a3ad4, 0xe84a8a, 0xf0f0f0, 0x20b8a8];
+// Candy colors from photo — natural, slightly muted like real candy
+const CANDY_COLORS = [0xc22a24, 0xd45a20, 0xddb020, 0x3a943a, 0x2a6ec2, 0x7a3ab2, 0xd44a7a, 0xe8e0d0, 0x1a9a90];
 
 // === BOOTH STRUCTURE ===
 // Floor
